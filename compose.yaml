@@ -1,0 +1,17 @@
+services:
+  api:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      TARGET_URL: ${TARGET_URL:-https://example.com}
+      DATABASE_PATH: /app/data/checks.db
+    volumes:
+      - checks-data:/app/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  checks-data:
