@@ -1,0 +1,1 @@
+"""HTTP availability monitoring application."""
