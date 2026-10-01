@@ -1,92 +1,101 @@
 # CloudOps Lab
 
-A small HTTP availability monitor built with Python, FastAPI, SQLite and Docker. It checks a configured URL and stores the result and response time for later inspection.
+Um pequeno monitor de disponibilidade HTTP desenvolvido com Python, FastAPI, SQLite e Docker. Verifica um URL configurado e guarda o resultado e o tempo de resposta para consulta posterior.
 
-## Current scope
+## Funcionalidades atuais
 
-- Run an on-demand check against one target configured by the operator.
-- Store HTTP status, time to response headers, UTC timestamp and network failures.
-- Read persistent check history, newest first.
-- Run the API as a non-root container, exposed only on localhost.
+- Verificação, a pedido, de um serviço definido na configuração.
+- Registo do código de estado HTTP, do tempo até à receção dos cabeçalhos, da data e hora em UTC e de eventuais falhas de rede.
+- Consulta do histórico persistente, com as verificações mais recentes em primeiro lugar.
+- Execução da API num contentor sem privilégios de administrador, acessível apenas através de `localhost`.
 
-Checks are currently manual. Scheduled monitoring, dashboards and AWS deployment are planned additions.
+As verificações são atualmente manuais. Estão previstas a monitorização periódica, a criação de painéis e a disponibilização da aplicação na AWS.
 
 ```mermaid
 flowchart LR
-    User[User / Swagger UI] --> API[FastAPI]
-    API --> Target[Configured HTTP service]
-    API --> DB[(SQLite history)]
+    User[Utilizador / Swagger UI] --> API[FastAPI]
+    API --> Target[Serviço HTTP configurado]
+    API --> DB[(Histórico em SQLite)]
 ```
 
-## Quick start with Docker
+## Arranque com Docker
 
-Requires Docker Desktop running with Linux containers, or Docker Engine with Compose on Linux.
+É necessário ter o Docker Desktop em execução, com contentores Linux, ou o Docker Engine com Compose num sistema Linux.
 
 ```sh
 docker compose up --build -d
 ```
 
-Open http://localhost:8000/docs. Under **POST /checks**, select **Try it out**, then **Execute**. Use **GET /checks** to view history and **GET /health** to check API liveness.
+Abrir <http://localhost:8000/docs>. Na operação **POST /checks**, selecionar **Try it out** e, de seguida, **Execute**. Utilizar **GET /checks** para consultar o histórico e **GET /health** para confirmar que a API está ativa.
 
-The default target is `https://example.com`. To change it, copy `.env.example` to `.env`, edit `TARGET_URL`, then run `docker compose up -d` again. Use a trusted target that you are authorized to monitor, without credentials or sensitive tokens in its URL.
+O URL predefinido é `https://example.com`. Para o alterar, copiar `.env.example` para `.env`, modificar `TARGET_URL` e executar novamente `docker compose up -d`. O serviço escolhido deve ser de confiança e a sua monitorização deve estar autorizada. O URL não deve conter credenciais nem tokens sensíveis.
+
+Para acompanhar os registos da aplicação:
 
 ```sh
 docker compose logs -f api
+```
+
+Para parar e remover os contentores:
+
+```sh
 docker compose down
 ```
 
-The named volume retains history after `down`. Adding `--volumes` removes that history.
+O volume mantém o histórico após a execução de `down`. A opção `--volumes` elimina esse volume e os dados nele guardados.
 
-## Run locally with Python
+## Execução local com Python
 
-Requires Python 3.12+.
+É necessário Python 3.12 ou superior.
 
 ```sh
 python -m venv .venv
 ```
 
-Activate the environment using `.venv\Scripts\Activate.ps1` in PowerShell or `source .venv/bin/activate` on Linux/macOS, then:
+Ativar o ambiente virtual com `.venv\Scripts\Activate.ps1` no PowerShell ou `source .venv/bin/activate` em Linux/macOS. De seguida, executar:
 
 ```sh
 python -m pip install -r requirements-dev.txt
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-The SQLite database is created in `data/checks.db`. For direct Python execution, set `TARGET_URL` and optionally `DATABASE_PATH` as shell environment variables; `.env` is only loaded automatically by Compose.
+A base de dados SQLite é criada em `data/checks.db`. Na execução direta com Python, `TARGET_URL` e, opcionalmente, `DATABASE_PATH` devem ser definidos como variáveis de ambiente no terminal. O ficheiro `.env` só é carregado automaticamente pelo Compose.
 
 ## API
 
-| Method | Path | Behaviour |
+| Método | Caminho | Funcionamento |
 | --- | --- | --- |
-| GET | `/health` | API liveness, independent of target availability |
-| POST | `/checks` | Run and persist one check; returns HTTP 201 even when the target is down |
-| GET | `/checks?limit=20` | Latest checks, with a limit from 1 to 100 |
-| GET | `/docs` | Interactive API documentation |
+| GET | `/health` | Confirma que a API está ativa, independentemente da disponibilidade do serviço monitorizado |
+| POST | `/checks` | Executa e guarda uma verificação; devolve HTTP 201 mesmo quando o serviço está indisponível |
+| GET | `/checks?limit=20` | Devolve as verificações mais recentes, com um limite entre 1 e 100 |
+| GET | `/docs` | Apresenta a documentação interativa da API |
 
-HTTP 200–399 is classified as `up`; other final HTTP statuses and network errors are `down`. Redirects are recorded without being followed. Latency measures time until response headers, including client setup; response bodies are not downloaded. HTTPX timeouts are set to five seconds per network operation, not a five-second total deadline. TLS certificate verification stays enabled, and proxy settings from the environment are ignored.
+As respostas HTTP de 200 a 399 são classificadas como `up`. Os restantes códigos de resposta finais e os erros de rede são classificados como `down`. Os redirecionamentos são registados, mas não são seguidos.
 
-## Tests
+A latência mede o tempo até à receção dos cabeçalhos da resposta, incluindo a preparação do cliente HTTP. O corpo da resposta não é descarregado. O HTTPX tem um tempo limite de cinco segundos por operação de rede; este valor não corresponde a um limite total de cinco segundos para toda a verificação. A validação dos certificados TLS mantém-se ativa e as definições de proxy do ambiente são ignoradas.
+
+## Testes
 
 ```sh
 python -m pytest -q
 ```
 
-Tests use simulated HTTP responses and temporary databases. They cover successful and failing statuses, redirects, timeouts, connection errors, persistence across restarts, history ordering and invalid input. No public website or AWS account is needed.
+Os testes utilizam respostas HTTP simuladas e bases de dados temporárias. Abrangem respostas de sucesso e de erro, redirecionamentos, tempos limite, erros de ligação, persistência após reinícios, ordenação do histórico e dados de entrada inválidos. Não é necessário aceder a um site público nem ter uma conta AWS.
 
-The GitHub Actions workflow runs the tests, validates the Compose configuration and builds the Docker image on pushes and pull requests. It can also be started manually from the Actions tab.
+O fluxo de integração contínua no GitHub Actions executa os testes, valida a configuração do Compose e constrói a imagem Docker a cada envio de alterações (*push*) e em pedidos de integração (*pull requests*). Também pode ser iniciado manualmente no separador **Actions**.
 
-## Boundaries and next milestones
+## Limitações e próximos passos
 
-The API runs locally and has no authentication or rate limiting. Do not expose it publicly in this form. The target URL is set through environment configuration, not API input. SQLite history has no retention policy yet.
+A API funciona localmente e ainda não tem autenticação nem limitação da frequência dos pedidos. Nesta fase, não deve ser exposta publicamente. O URL monitorizado é definido na configuração do ambiente, não através de pedidos à API. O histórico em SQLite ainda não tem uma política de retenção.
 
-1. Add scheduled checks and structured logs.
-2. Add vulnerability and secret scanning to CI.
-3. Provision AWS infrastructure with Terraform after reviewing costs and access controls.
-4. Add metrics, alerts and a documented recovery exercise.
+1. Acrescentar verificações periódicas e registos estruturados.
+2. Integrar a deteção de vulnerabilidades e de credenciais expostas no processo de integração contínua.
+3. Criar a infraestrutura AWS com Terraform, após analisar os custos e os controlos de acesso.
+4. Acrescentar métricas, alertas e um exercício documentado de recuperação de falhas.
 
-No AWS resources are provisioned by this repository at this stage.
+Nesta fase, o repositório não cria recursos na AWS.
 
-## Design references
+## Referências técnicas
 
-- [FastAPI container deployment](https://fastapi.tiangolo.com/deployment/docker/)
-- [HTTPX timeout behaviour](https://www.python-httpx.org/advanced/timeouts/)
+- [Execução do FastAPI em contentores](https://fastapi.tiangolo.com/deployment/docker/)
+- [Funcionamento dos tempos limite no HTTPX](https://www.python-httpx.org/advanced/timeouts/)
