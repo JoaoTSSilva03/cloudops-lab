@@ -5,6 +5,12 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 
 
+@pytest.fixture(autouse=True)
+def disable_periodic_checks(monkeypatch):
+    """Os testes dos pedidos manuais não devem iniciar tráfego automático."""
+    monkeypatch.setenv("CHECK_INTERVAL_SECONDS", "0")
+
+
 @pytest.mark.parametrize("code, expected", [(200, "up"), (302, "up"), (404, "down"), (503, "down")])
 def test_check_status_and_persistence(tmp_path, code, expected):
     requests = []
