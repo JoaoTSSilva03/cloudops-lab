@@ -5,6 +5,7 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       TARGET_URL: ${TARGET_URL:-https://example.com}
+      CHECK_INTERVAL_SECONDS: ${CHECK_INTERVAL_SECONDS:-60}
       DATABASE_PATH: /app/data/checks.db
     volumes:
       - checks-data:/app/data
